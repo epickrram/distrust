@@ -31,7 +31,6 @@ impl<'a, T> RingBuffer<'a, T> {
 	}
 }
 
-
 pub fn new_single_thread_sequencer() -> SingleThreadSequence {
 	SingleThreadSequence {next_available_sequence: 0}
 }
@@ -46,6 +45,8 @@ pub struct SingleThreadSequence {
 
 impl Sequencer for SingleThreadSequence {
 	fn next_sequence(&mut self) -> i64 {
-		0
+		let next_sequence = self.next_available_sequence;
+		self.next_available_sequence += 1;
+		next_sequence
 	}
 }
