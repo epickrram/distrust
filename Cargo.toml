@@ -1,0 +1,5 @@
+[package]
+name = "distrust"
+version = "0.1.0"
+authors = [ "Mark Price <mail@epickrram.com>" ]
+
