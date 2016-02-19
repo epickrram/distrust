@@ -1,3 +1,5 @@
+use std::sync::atomic::{Ordering, fence};
+
 pub fn new_ring_buffer<'a, T>(container: Box<[T]>, sequencer: &'a mut Sequencer) -> Option<RingBuffer<'a, T>> {
 	let buffer_length = container.len() as i64;
 	
@@ -9,7 +11,8 @@ pub fn new_ring_buffer<'a, T>(container: Box<[T]>, sequencer: &'a mut Sequencer)
         values: container,
         sequencer: sequencer,
         length: buffer_length,
-        mask: buffer_length - 1
+        mask: buffer_length - 1,
+        published_sequence: -1
 	})
 }
 
@@ -17,7 +20,8 @@ pub struct RingBuffer<'a, T> {
     values: Box<[T]>,
     sequencer: &'a mut Sequencer,
     length: i64,
-    mask: i64
+    mask: i64,
+    published_sequence: i64
 }
 
 impl<'a, T> RingBuffer<'a, T> {
@@ -28,6 +32,13 @@ impl<'a, T> RingBuffer<'a, T> {
 	pub fn publish(&mut self, sequence: i64, item: T) {
 		let offset = sequence & self.mask;
 		self.values[offset as usize] = item;
+		self.published_sequence = sequence;
+		fence(Ordering::Release);
+	}
+	
+	pub fn get_published_sequence(&self) -> i64 {
+		fence(Ordering::Acquire);
+		self.published_sequence
 	}
 }
 
