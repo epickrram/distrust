@@ -12,7 +12,7 @@ fn should_ensure_that_length_is_a_power_of_two() {
 	let size: usize = 3;
 	let container = vec![Item {id: 0, payload: 0}; size].into_boxed_slice();
 	let mut sequencer = new_single_thread_sequencer();
-	let optional_buffer = new_ring_buffer(container, &mut sequencer);
+	let optional_buffer = new_ring_buffer(container, sequencer);
 	
 	assert!(optional_buffer.is_none())
 }
@@ -21,7 +21,7 @@ fn should_ensure_that_length_is_a_power_of_two() {
 #[test]
 fn should_advance_sequence_number() {
 	let (mut sequencer, container) = construct_params();
-	let mut buffer = new_ring_buffer(container, &mut sequencer).unwrap();
+	let mut buffer = new_ring_buffer(container, sequencer).unwrap();
 	
 	assert_eq!(buffer.get_next_sequence(), 0);
 	assert_eq!(buffer.get_next_sequence(), 1);
@@ -30,7 +30,7 @@ fn should_advance_sequence_number() {
 #[test]
 fn should_advance_published_sequence() {
 	let (mut sequencer, container) = construct_params();
-	let mut buffer = new_ring_buffer(container, &mut sequencer).unwrap();
+	let mut buffer = new_ring_buffer(container, sequencer).unwrap();
 	let item = Item {id: 7, payload: 11 };
 	
 	let sequence = buffer.get_next_sequence();
@@ -39,19 +39,29 @@ fn should_advance_published_sequence() {
 	assert_published_sequence(&buffer, 0);
 }
 
-#[ignore]
 #[test]
 fn should_be_readable_from_multiple_threads() {
 	let (mut sequencer, container) = construct_params();
 	
-	let mut buffer = new_ring_buffer(container, &mut sequencer).unwrap();
-	let ro_buffer = &buffer;
-//	
-//	let child = thread::spawn(move || {
-//	    assert_eq!(0, ro_buffer.published_sequence());
-//	});
-//	
-//	let res = child.join();
+	let mut buffer = new_ring_buffer(container, sequencer).unwrap();
+	
+	let boxed_1 = Box::new(buffer);
+	let raw = Box::into_raw(boxed_1);
+	let mut boxed_2 : Box<RingBuffer<Item>>;
+	let mut boxed_3 : Box<RingBuffer<Item>>;
+	unsafe {
+	boxed_2 = Box::from_raw(raw);
+	boxed_3 = Box::from_raw(raw);
+	}
+	
+	
+	
+	let child = thread::spawn(move || {
+	    assert_eq!(0, boxed_2.get_next_sequence());
+	    mem::forget(boxed_2);
+	});
+	
+	let res = child.join();
 }
 
 struct Foo {

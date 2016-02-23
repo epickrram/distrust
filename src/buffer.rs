@@ -1,6 +1,6 @@
 use std::sync::atomic::{Ordering, fence};
 
-pub fn new_ring_buffer<'a, T, S: Sequencer + Sized>(container: Box<[T]>, sequencer: &'a S) -> Option<RingBuffer<'a, T>> {
+pub fn new_ring_buffer<T>(container: Box<[T]>, sequencer: SingleThreadSequence) -> Option<RingBuffer<T>> {
 	let buffer_length = container.len() as i64;
 	
 	if buffer_length.count_ones() != 1 {
@@ -16,15 +16,15 @@ pub fn new_ring_buffer<'a, T, S: Sequencer + Sized>(container: Box<[T]>, sequenc
 	})
 }
 
-pub struct RingBuffer<'a, T> {
+pub struct RingBuffer<T> {
     values: Box<[T]>,
-    sequencer: &'a Sequencer,
+    sequencer: SingleThreadSequence,
     length: i64,
     mask: i64,
     published_sequence: i64
 }
 
-impl<'a, T> RingBuffer<'a, T> {
+impl<T> RingBuffer<T> {
 	pub fn get_next_sequence(&mut self) -> i64 {
 //		let mut seq = self.sequencer;
 //		unsafe {
@@ -39,8 +39,14 @@ impl<'a, T> RingBuffer<'a, T> {
 		self.published_sequence = sequence;
 		fence(Ordering::Release);
 	}
-	
-	pub fn get_published_sequence(&self) -> i64 {
+}
+
+pub trait ReadableRingBuffer {
+	fn get_published_sequence(&self) -> i64;
+}
+
+impl<T> ReadableRingBuffer for RingBuffer<T> {
+	fn get_published_sequence(&self) -> i64 {
 		fence(Ordering::Acquire);
 		self.published_sequence
 	}
