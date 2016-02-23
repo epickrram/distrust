@@ -1,6 +1,11 @@
 extern crate distrust;
 
 use distrust::buffer::*;
+use std::thread;
+use std::sync::atomic::{AtomicIsize, Ordering};
+use std::sync::mpsc::channel;
+use std::sync::Arc;
+use std::mem;
 
 #[test]
 fn should_ensure_that_length_is_a_power_of_two() {
@@ -12,6 +17,7 @@ fn should_ensure_that_length_is_a_power_of_two() {
 	assert!(optional_buffer.is_none())
 }
 
+#[ignore]
 #[test]
 fn should_advance_sequence_number() {
 	let (mut sequencer, container) = construct_params();
@@ -31,6 +37,80 @@ fn should_advance_published_sequence() {
 	buffer.publish(sequence, item);
 	
 	assert_published_sequence(&buffer, 0);
+}
+
+#[ignore]
+#[test]
+fn should_be_readable_from_multiple_threads() {
+	let (mut sequencer, container) = construct_params();
+	
+	let mut buffer = new_ring_buffer(container, &mut sequencer).unwrap();
+	let ro_buffer = &buffer;
+//	
+//	let child = thread::spawn(move || {
+//	    assert_eq!(0, ro_buffer.published_sequence());
+//	});
+//	
+//	let res = child.join();
+}
+
+struct Foo<'a> {
+	sequence: &'a AtomicIsize
+}
+
+impl<'a> Foo<'a> {
+	fn next_available_sequence(&self) -> isize {
+		self.sequence.fetch_add(1, Ordering::Release) + 1
+	}
+	
+	fn current_sequence(&self) -> isize {
+		self.sequence.load(Ordering::Acquire)
+	}
+}
+
+#[test]
+fn should_share() {
+	let boxed_1 = Box::new(AtomicIsize::new(-1));
+	let raw = Box::into_raw(boxed_1);
+	let mut boxed_2 : Box<AtomicIsize> = Box::new(AtomicIsize::new(0));
+	let mut boxed_3 : Box<AtomicIsize> = Box::new(AtomicIsize::new(0));
+	unsafe {
+	boxed_2 = Box::from_raw(raw);
+	boxed_3 = Box::from_raw(raw);
+	}
+	
+	
+	let foo = Foo{sequence: &boxed_2};
+	assert_eq!(foo.next_available_sequence(), 0);
+	
+	
+	let child = thread::spawn(move || {
+			boxed_3.fetch_add(1, Ordering::Release);
+			mem::forget(boxed_3);
+    });
+    let res = child.join();
+    println!("res: {:?}", res);
+    assert_eq!(1, foo.current_sequence());
+}
+
+#[test]
+#[ignore]
+fn should_have_shared_atomic() {
+	let counter = Box::new(AtomicIsize::new(0));
+//	let ptr = &counter;
+	counter.fetch_add(1, Ordering::Release);
+//	
+//	let child = thread::spawn(|| {
+//		&counter.store(0, Ordering::Release);		
+//	});
+//	
+//	while counter.load(Ordering::Acquire) != 0 {
+//		// spin
+//	}
+//	
+//	let res = child.join();
+//	
+	assert_eq!(0, counter.load(Ordering::Acquire));
 }
 
 fn assert_published_sequence(buffer: &RingBuffer<Item>, expected_sequence: i64) {
