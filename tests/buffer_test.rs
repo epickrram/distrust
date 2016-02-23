@@ -54,11 +54,11 @@ fn should_be_readable_from_multiple_threads() {
 //	let res = child.join();
 }
 
-struct Foo<'a> {
-	sequence: &'a AtomicIsize
+struct Foo {
+	sequence: AtomicIsize
 }
 
-impl<'a> Foo<'a> {
+impl Foo {
 	fn next_available_sequence(&self) -> isize {
 		self.sequence.fetch_add(1, Ordering::Release) + 1
 	}
@@ -70,47 +70,26 @@ impl<'a> Foo<'a> {
 
 #[test]
 fn should_share() {
-	let boxed_1 = Box::new(AtomicIsize::new(-1));
+	let boxed_1 = Box::new(Foo{sequence: AtomicIsize::new(-1)});
 	let raw = Box::into_raw(boxed_1);
-	let mut boxed_2 : Box<AtomicIsize> = Box::new(AtomicIsize::new(0));
-	let mut boxed_3 : Box<AtomicIsize> = Box::new(AtomicIsize::new(0));
+	let mut boxed_2 : Box<Foo>;
+	let mut boxed_3 : Box<Foo>;
 	unsafe {
 	boxed_2 = Box::from_raw(raw);
 	boxed_3 = Box::from_raw(raw);
 	}
 	
 	
-	let foo = Foo{sequence: &boxed_2};
-	assert_eq!(foo.next_available_sequence(), 0);
+	assert_eq!(boxed_2.next_available_sequence(), 0);
 	
 	
 	let child = thread::spawn(move || {
-			boxed_3.fetch_add(1, Ordering::Release);
+			boxed_3.next_available_sequence();
 			mem::forget(boxed_3);
     });
     let res = child.join();
     println!("res: {:?}", res);
-    assert_eq!(1, foo.current_sequence());
-}
-
-#[test]
-#[ignore]
-fn should_have_shared_atomic() {
-	let counter = Box::new(AtomicIsize::new(0));
-//	let ptr = &counter;
-	counter.fetch_add(1, Ordering::Release);
-//	
-//	let child = thread::spawn(|| {
-//		&counter.store(0, Ordering::Release);		
-//	});
-//	
-//	while counter.load(Ordering::Acquire) != 0 {
-//		// spin
-//	}
-//	
-//	let res = child.join();
-//	
-	assert_eq!(0, counter.load(Ordering::Acquire));
+    assert_eq!(1, boxed_2.current_sequence());
 }
 
 fn assert_published_sequence(buffer: &RingBuffer<Item>, expected_sequence: i64) {
