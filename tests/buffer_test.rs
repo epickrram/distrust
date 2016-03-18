@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::mem;
+use std::ptr;
 
 #[test]
 fn should_ensure_that_length_is_a_power_of_two() {
@@ -48,7 +49,7 @@ fn should_be_readable_from_multiple_threads() {
 	let boxed_1 = Box::new(buffer);
 	let raw = Box::into_raw(boxed_1);
 	let mut boxed_2 : Box<RingBuffer<Item>>;
-	let mut boxed_3 : Box<RingBuffer<Item>>;
+	let boxed_3 : Box<RingBuffer<Item>>;
 	unsafe {
 	boxed_2 = Box::from_raw(raw);
 	boxed_3 = Box::from_raw(raw);
@@ -101,6 +102,7 @@ fn should_share() {
     println!("res: {:?}", res);
     assert_eq!(1, boxed_2.current_sequence());
 }
+
 
 fn assert_published_sequence(buffer: &RingBuffer<Item>, expected_sequence: i64) {
 	assert_eq!(expected_sequence, buffer.get_published_sequence());
