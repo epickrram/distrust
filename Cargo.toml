@@ -3,3 +3,7 @@ name = "distrust"
 version = "0.1.0"
 authors = [ "Mark Price <mail@epickrram.com>" ]
 
+[dependencies]
+libc = "0.2.0"
+memmap = "0.2.3"
+

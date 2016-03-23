@@ -7,6 +7,20 @@ use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::mem;
 use std::ptr;
+use std::mem::transmute;
+use std::io::Write;
+
+#[test]
+fn test_transmuting() {
+    let mut data: [u8; 8] = [42, 0, 0, 0, 0, 0, 0, 0];
+
+    let ptr_to_atomic: &mut AtomicIsize = unsafe { mem::transmute(data.get_unchecked_mut(0)) };
+    assert_eq!(42, ptr_to_atomic.load(Ordering::Acquire));
+    ptr_to_atomic.fetch_add(37, Ordering::SeqCst);
+    assert_eq!(42 + 37, ptr_to_atomic.load(Ordering::Acquire));
+    data[0] = 17;
+    assert_eq!(17, ptr_to_atomic.load(Ordering::Acquire));
+}
 
 #[test]
 fn should_ensure_that_length_is_a_power_of_two() {
