@@ -1,14 +1,50 @@
 extern crate memmap;
 
 use std::sync::atomic::AtomicIsize;
+use std::sync::atomic::Ordering;
 use std::fs::File;
 use std::ptr::read;
 use std::ptr::write;
 use std::mem::size_of;
+use std::mem;
 use std::mem::transmute;
 use memmap::{Mmap, Protection};
 
 const HEADER_BYTES: usize = 8;
+
+pub struct MappedAtomicIsize<'a> {
+    value: &'a AtomicIsize
+}
+
+impl<'a> MappedAtomicIsize<'a> {
+    pub fn load(&self, ordering: Ordering) -> isize {
+        self.value.load(ordering)
+    }
+
+    pub fn fetch_add(&self, value_to_add: isize, ordering: Ordering) -> isize {
+        self.value.fetch_add(value_to_add, ordering)
+    }
+}
+
+pub fn create_mapped_atomic(mem: &mut memmap::Mmap, offset: usize) -> MappedAtomicIsize {
+    let data: &mut[u8] = unsafe { mem.as_mut_slice() };
+    MappedAtomicIsize {
+        value:  unsafe { mem::transmute(data.get_unchecked(offset)) }
+    }
+
+}
+
+pub fn create_mapped_atomic_isize(file: &File, offset: usize) -> MappedAtomicIsize {
+    let mut mem = match memmap::Mmap::open(file, memmap::Protection::ReadWrite) {
+        Err(reason) => panic!("Failed to map file: {}", reason),
+        Ok(memFile) => memFile
+    };
+    let data: &mut[u8] = unsafe { mem.as_mut_slice() };
+    MappedAtomicIsize {
+        value:  unsafe { mem::transmute(data.get_unchecked(offset)) }
+    }
+}
+
 
 pub trait Serialisable {
     fn transmute<'a>(&self) -> &'a[u8];
