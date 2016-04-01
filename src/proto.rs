@@ -3,6 +3,10 @@ extern crate memmap;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
 use std::fs::File;
+use std::fs::OpenOptions;
+use std::path::Path;
+use std::error::Error;
+use std::io::prelude::*;
 use std::ptr::read;
 use std::ptr::write;
 use std::mem::size_of;
@@ -34,6 +38,7 @@ pub fn create_mapped_atomic(mem: &mut memmap::Mmap, offset: usize) -> MappedAtom
 
 }
 
+
 pub fn create_mapped_atomic_isize(file: &File, offset: usize) -> MappedAtomicIsize {
     let mut mem = match memmap::Mmap::open(file, memmap::Protection::ReadWrite) {
         Err(reason) => panic!("Failed to map file: {}", reason),
@@ -45,15 +50,36 @@ pub fn create_mapped_atomic_isize(file: &File, offset: usize) -> MappedAtomicIsi
     }
 }
 
+fn map_file(path: &Path) -> memmap::Mmap {
+    println!("Mapping....");
+    let file = OpenOptions::new().write(true).read(true).open(path).unwrap();
+    let mut mem = match memmap::Mmap::open(&file, memmap::Protection::ReadWrite) {
+        Err(reason) => panic!("Failed to map file: {}", reason),
+        Ok(memFile) => memFile
+    };
+
+    mem
+}
+
 
 pub trait Serialisable {
     fn transmute<'a>(&self) -> &'a[u8];
 }
 
 pub struct Buffer {
-    capacity: usize,
+    capacity: isize,
     mem: memmap::Mmap
 }
+
+
+pub fn create_buffer(path: &Path, capacity: isize) -> Buffer {
+    let mem = map_file(path);
+    Buffer {
+        capacity: capacity,
+        mem: mem
+    }
+}
+
 
 impl Buffer {
     pub fn sequence() {
@@ -62,14 +88,6 @@ impl Buffer {
         let num: isize = unsafe { transmute(data) };
         let i_bytes: isize = unsafe { transmute(s) };
         println!("{:?}", i_bytes);
-    }
-    pub fn create<T>(capacity: usize, file: &File) -> Self {
-        let size_of_record = size_of::<T>();
-        let mem = memmap::Mmap::open(file, memmap::Protection::ReadWrite).unwrap();
-        Buffer {
-            capacity: capacity,
-            mem: mem
-        }
     }
 
     pub fn offer<T: Serialisable>(&mut self, item: T) -> bool {
